@@ -7,12 +7,46 @@ import math
 # Initialize pygame
 pygame.init()
 
-# Constants
+# Game Grid Constants
 GRID_WIDTH = 17
 GRID_HEIGHT = 10
 CELL_SIZE = 50
 MARGIN = 5
-TIME_LIMIT = 120 # seconds
+TIME_LIMIT = 120  # seconds
+
+# Visual Effect Constants
+MAX_SCALE = 1.8  # Maximum size increase when hovering
+EFFECT_RADIUS = 150  # How far the hover effect extends in pixels
+JIGGLE_AMPLITUDE = 3.0  # Maximum pixel offset for jiggle
+JIGGLE_SPEED = 2.0  # Speed of jiggle animation
+JIGGLE_RANDOM_FACTOR = 0.2  # Random factor for organic feel
+BASE_FONT_SIZE = 36 # Base font size for numbers
+SMALL_FONT_SIZE = 24  # Font size for smaller text
+MIN_RENDER_SIZE = 10  # Minimum size to render animated numbers
+
+# Animation Constants
+ANIMATION_SPEED_MIN = 8.0  # Minimum speed for animated numbers
+ANIMATION_SPEED_MAX = 12.0  # Maximum speed for animated numbers
+SCALE_DECREASE_RATE = 0.02  # How quickly animated numbers shrink
+ALPHA_DECREASE_RATE = 5  # How quickly animated numbers fade
+
+# Game Mechanics
+WINNING_SUM = 10  # The sum that counts as a win when selected
+
+# UI Constants
+OVERLAY_ALPHA = 100 # Transparency for game over overlay
+MODAL_WIDTH = 400  # Width of game over modal
+MODAL_HEIGHT = 200  # Height of game over modal
+SELECTION_BORDER_WIDTH = 3  # Width of selection rectangle border
+TIMER_BAR_HEIGHT = 20  # Height of the timer bar
+UI_PADDING = 20  # Padding for UI elements
+SCORE_Y_OFFSET = 80  # Y offset for score display
+TIMER_Y_OFFSET = 50  # Y offset for timer bar
+
+# Modal Text Positions
+GAMEOVER_TEXT_Y_OFFSET = 60  # Y offset for "GAME OVER" text
+SCORE_TEXT_Y_OFFSET = 100  # Y offset for final score text
+RESTART_TEXT_Y_OFFSET = 140  # Y offset for restart instructions
 
 # Calculated constants
 SCREEN_WIDTH = GRID_WIDTH * (CELL_SIZE + MARGIN) + MARGIN
@@ -21,12 +55,8 @@ SCREEN_HEIGHT = GRID_HEIGHT * (CELL_SIZE + MARGIN) + MARGIN + 100  # Extra space
 # Colors
 WHITE = (104, 238, 247)
 BLACK = (8, 51, 54)
-GRAY = (50, 50, 50)  # Darker gray for empty cells
-BLUE = (0, 0, 255)
-RED = (255, 0, 0)
-GREEN = (0, 255, 0)
 TIMER_BG = (15, 96, 102)  # Background color for timer bar
-TIMER_COLOR = WHITE #(0, 191, 255)  # Color for timer bar
+TIMER_COLOR = WHITE  # Color for timer bar
 
 # Create the screen
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -34,8 +64,8 @@ pygame.display.set_caption("Lumon Box")
 
 # Font setup
 FONT = None
-font = pygame.font.SysFont(FONT, 36)
-small_font = pygame.font.SysFont(FONT, 24)
+font = pygame.font.SysFont(FONT, BASE_FONT_SIZE)
+small_font = pygame.font.SysFont(FONT, SMALL_FONT_SIZE)
 
 class AnimatedNumber:
     def __init__(self, value, x, y, target_x, target_y):
@@ -44,7 +74,7 @@ class AnimatedNumber:
         self.y = y
         self.target_x = target_x
         self.target_y = target_y
-        self.speed = random.uniform(8, 15)
+        self.speed = random.uniform(ANIMATION_SPEED_MIN, ANIMATION_SPEED_MAX)
         self.scale = 1.0
         self.alpha = 255
         self.lifetime = 0
@@ -60,8 +90,8 @@ class AnimatedNumber:
         
         # Update properties
         self.lifetime += 1
-        self.scale -= 0.03
-        self.alpha -= 5
+        self.scale -= SCALE_DECREASE_RATE
+        self.alpha -= ALPHA_DECREASE_RATE
         
         # Return True if animation should continue
         return self.scale > 0 and self.alpha > 0
@@ -125,11 +155,11 @@ class Game:
     
     def calculate_selection_sum(self):
         if not self.selection_start or not self.selection_end:
-            return 0
+            return 0, 0
         
         rect = self.get_selection_rect()
         if not rect:
-            return 0
+            return 0, 0
         
         x1, y1, x2, y2 = rect
         selection_sum = 0
@@ -149,7 +179,7 @@ class Game:
         
         selection_sum, count = self.calculate_selection_sum()
         
-        if selection_sum == 10:
+        if selection_sum == WINNING_SUM:
             rect = self.get_selection_rect()
             x1, y1, x2, y2 = rect
             
@@ -232,41 +262,33 @@ def draw_grid(game):
                 # Calculate distance from mouse cursor to the center of this cell
                 distance = ((center_x - mouse_x) ** 2 + (center_y - mouse_y) ** 2) ** 0.5
                 
-                # Set maximum enlargement factor and effect radius
-                max_scale = 2.0  # Maximum size increase
-                effect_radius = 150  # How far the effect extends
-                
                 # Calculate scale factor based on distance (tapers off gradually)
-                if distance < effect_radius:
+                if distance < EFFECT_RADIUS:
                     # Scale decreases linearly with distance
-                    scale_factor = max_scale - (distance / effect_radius) * (max_scale - 1.0)
-                    scale_factor = max(1.0, min(max_scale, scale_factor))  # Clamp between 1.0 and max_scale
-                    
-                    # Add jiggle effect for numbers under cursor
-                    jiggle_amplitude = 3.0  # Maximum pixel offset for jiggle
-                    jiggle_speed = 3.0  # Speed of jiggle animation
+                    scale_factor = MAX_SCALE - (distance / EFFECT_RADIUS) * (MAX_SCALE - 1.0)
+                    scale_factor = max(1.0, min(MAX_SCALE, scale_factor))  # Clamp between 1.0 and MAX_SCALE
                     
                     # Calculate jiggle offset based on distance from cursor
                     # The closer to cursor, the stronger the jiggle
-                    jiggle_factor = (1 - distance / effect_radius) * jiggle_amplitude
+                    jiggle_factor = (1 - distance / EFFECT_RADIUS) * JIGGLE_AMPLITUDE
                     
                     # Get the unique offset for this cell
                     offset_x, offset_y = game.jiggle_offsets[y][x]
                     
                     # Use unique offset to create independent jiggle motion for each number
-                    jiggle_x = math.sin(current_time * jiggle_speed + offset_x) * jiggle_factor
-                    jiggle_y = math.cos(current_time * jiggle_speed * 1.3 + offset_y) * jiggle_factor
+                    jiggle_x = math.sin(current_time * JIGGLE_SPEED + offset_x) * jiggle_factor
+                    jiggle_y = math.cos(current_time * JIGGLE_SPEED * 1.3 + offset_y) * jiggle_factor
                     
                     # Add tiny randomness for extra organic feel
-                    jiggle_x += random.uniform(-0.2, 0.2) * jiggle_factor * 0.3
-                    jiggle_y += random.uniform(-0.2, 0.2) * jiggle_factor * 0.3
+                    jiggle_x += random.uniform(-JIGGLE_RANDOM_FACTOR, JIGGLE_RANDOM_FACTOR) * jiggle_factor * 0.3
+                    jiggle_y += random.uniform(-JIGGLE_RANDOM_FACTOR, JIGGLE_RANDOM_FACTOR) * jiggle_factor * 0.3
                 else:
                     scale_factor = 1.0  # No scaling beyond the effect radius
                     jiggle_x = 0
                     jiggle_y = 0
                 
                 # Create a font with the scaled size
-                scaled_size = int(36 * scale_factor)  # Base font size is 36
+                scaled_size = int(BASE_FONT_SIZE * scale_factor)
                 scaled_font = pygame.font.SysFont(FONT, scaled_size)
                 
                 # Render the number with the scaled font
@@ -281,26 +303,19 @@ def draw_selection(game):
         if rect:
             x1, y1, x2, y2 = rect
             
-            selection_sum, _ = game.calculate_selection_sum()
-            color = WHITE #GREEN if selection_sum == 10 else RED
-            
             # Draw rectangle around selection
             start_x = MARGIN + x1 * (CELL_SIZE + MARGIN)
             start_y = MARGIN + y1 * (CELL_SIZE + MARGIN)
             width = (x2 - x1 + 1) * (CELL_SIZE + MARGIN) - MARGIN
             height = (y2 - y1 + 1) * (CELL_SIZE + MARGIN) - MARGIN
             
-            pygame.draw.rect(screen, color, [start_x, start_y, width, height], 3)
-            
-            # Display the sum
-            #sum_text = small_font.render(f"Sum: {selection_sum}", True, WHITE)
-            #screen.blit(sum_text, (start_x, start_y - 20))
+            pygame.draw.rect(screen, WHITE, [start_x, start_y, width, height], SELECTION_BORDER_WIDTH)
 
 def draw_animated_numbers(game):
     for anim in game.animated_numbers:
         # Calculate font size
-        scaled_size = int(36 * anim.scale)
-        if scaled_size < 10:  # Skip rendering very small numbers
+        scaled_size = int(BASE_FONT_SIZE * anim.scale)
+        if scaled_size < MIN_RENDER_SIZE:  # Skip rendering very small numbers
             continue
             
         # Create font and render number
@@ -315,54 +330,52 @@ def draw_animated_numbers(game):
         screen.blit(surf, text_rect)
 
 def draw_ui(game):
-    # Draw score
+    # Calculate actual progress percentage
     progress = 100 * game.score / (GRID_WIDTH * GRID_HEIGHT)
-    score_text = font.render(f"Progress: {game.score:.0f}%", True, WHITE)
-    screen.blit(score_text, (20, SCREEN_HEIGHT - 80))
+    score_text = font.render(f"Progress: {progress:.1f}%", True, WHITE)
+    screen.blit(score_text, (UI_PADDING, SCREEN_HEIGHT - SCORE_Y_OFFSET))
     
     # Draw timer as a bar
     remaining = game.get_remaining_time()
     timer_percentage = remaining / TIME_LIMIT
     
     # Timer bar background
-    timer_bg_rect = pygame.Rect(20, SCREEN_HEIGHT - 50, SCREEN_WIDTH - 40, 20)
+    timer_bg_rect = pygame.Rect(UI_PADDING, SCREEN_HEIGHT - TIMER_Y_OFFSET, SCREEN_WIDTH - 2 * UI_PADDING, TIMER_BAR_HEIGHT)
     pygame.draw.rect(screen, TIMER_BG, timer_bg_rect)
     
     # Timer bar foreground (decreasing)
-    timer_width = int((SCREEN_WIDTH - 40) * timer_percentage)
-    timer_rect = pygame.Rect(20, SCREEN_HEIGHT - 50, timer_width, 20)
+    timer_width = int((SCREEN_WIDTH - 2 * UI_PADDING) * timer_percentage)
+    timer_rect = pygame.Rect(UI_PADDING, SCREEN_HEIGHT - TIMER_Y_OFFSET, timer_width, TIMER_BAR_HEIGHT)
     pygame.draw.rect(screen, TIMER_COLOR, timer_rect)
     
     # Draw game over modal if time is up
     if game.is_game_over():
         # Create semi-transparent overlay
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 180))  # Dark background with alpha
+        overlay.fill((0, 0, 0, OVERLAY_ALPHA))  # Dark background with alpha
         screen.blit(overlay, (0, 0))
         
         # Calculate modal box dimensions
-        modal_width = 400
-        modal_height = 200
-        modal_x = (SCREEN_WIDTH - modal_width) // 2
-        modal_y = (SCREEN_HEIGHT - modal_height) // 2
+        modal_x = (SCREEN_WIDTH - MODAL_WIDTH) // 2
+        modal_y = (SCREEN_HEIGHT - MODAL_HEIGHT) // 2
         
         # Draw modal box with light frame
-        pygame.draw.rect(screen, BLACK, [modal_x, modal_y, modal_width, modal_height])  # Dark background
-        pygame.draw.rect(screen, WHITE, [modal_x, modal_y, modal_width, modal_height], 3)  # Light frame
+        pygame.draw.rect(screen, BLACK, [modal_x, modal_y, MODAL_WIDTH, MODAL_HEIGHT])  # Dark background
+        pygame.draw.rect(screen, WHITE, [modal_x, modal_y, MODAL_WIDTH, MODAL_HEIGHT], SELECTION_BORDER_WIDTH)  # Light frame
         
         # Draw game over text
         game_over_text = font.render("GAME OVER", True, WHITE)
-        text_rect = game_over_text.get_rect(center=(SCREEN_WIDTH // 2, modal_y + 60))
+        text_rect = game_over_text.get_rect(center=(SCREEN_WIDTH // 2, modal_y + GAMEOVER_TEXT_Y_OFFSET))
         screen.blit(game_over_text, text_rect)
         
         # Draw score text
-        score_text = font.render(f"Final Progress: {game.score}%", True, WHITE)
-        score_rect = score_text.get_rect(center=(SCREEN_WIDTH // 2, modal_y + 100))
-        screen.blit(score_text, score_rect)
+        final_score_text = font.render(f"Final Progress: {progress:.1f}%", True, WHITE)
+        score_rect = final_score_text.get_rect(center=(SCREEN_WIDTH // 2, modal_y + SCORE_TEXT_Y_OFFSET))
+        screen.blit(final_score_text, score_rect)
         
         # Draw restart instruction
         restart_text = small_font.render("Press 'R' to restart", True, WHITE)
-        restart_rect = restart_text.get_rect(center=(SCREEN_WIDTH // 2, modal_y + 140))
+        restart_rect = restart_text.get_rect(center=(SCREEN_WIDTH // 2, modal_y + RESTART_TEXT_Y_OFFSET))
         screen.blit(restart_text, restart_rect)
 
 def main():
