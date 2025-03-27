@@ -12,7 +12,7 @@ GRID_WIDTH = 17
 GRID_HEIGHT = 10
 CELL_SIZE = 50
 MARGIN = 5
-TIME_LIMIT = 60  # seconds
+TIME_LIMIT = 120 # seconds
 
 # Calculated constants
 SCREEN_WIDTH = GRID_WIDTH * (CELL_SIZE + MARGIN) + MARGIN
